@@ -1,0 +1,18 @@
+# Python compilation files
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+env/
+
+# Application logs
+logs/
+*.log
+
+# Databases
+*.db
+*.sqlite3
+
+# DeepFace cached models (optional but recommended for CV)
+.deepface/
