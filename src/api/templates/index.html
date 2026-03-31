@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartFace | Attendance Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar: Control Panel & Registration -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fas fa-microchip"></i>
+                <h1>Smart<span>Face</span></h1>
+            </div>
+
+            <section class="controls">
+                <span class="section-title">System Controls</span>
+                <div class="controls-grid">
+                    <button id="camera-btn" class="btn btn-outline active" onclick="toggleCamera()">
+                        <i class="fas fa-video"></i>
+                        <span>CAM</span>
+                    </button>
+                    <button id="ai-btn" class="btn btn-outline active" onclick="toggleAI()">
+                        <i class="fas fa-brain"></i>
+                        <span>AI</span>
+                    </button>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <select id="camera-select" class="input-field" onchange="changeCamera()" style="margin:0; font-size:0.8rem; height:45px">
+                        <option value="0">Source 0 (Default)</option>
+                        <option value="1">Source 1 (External)</option>
+                        <option value="2">Source 2 (Alt)</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="registration">
+                <span class="section-title">Enroll New Participant</span>
+                <div class="registration-form">
+                    <form onsubmit="registerUser(event)">
+                        <input type="text" id="person-name" class="input-field" placeholder="Full Name" required>
+                        <button id="enroll-btn" type="submit" class="btn btn-primary">
+                            <i class="fas fa-user-plus"></i> ENROLL NOW
+                        </button>
+                    </form>
+                    <div id="enroll-status" class="status-msg"></div>
+                </div>
+            </section>
+
+            <section class="info" style="margin-top:auto">
+                <span class="section-title">Device Info</span>
+                <p style="font-size: 0.8rem; opacity:0.6"><i class="fas fa-microchip"></i> Localhost Node: active</p>
+                <p style="font-size: 0.8rem; opacity:0.6"><i class="fas fa-shield-alt"></i> SQLite DB: connected</p>
+            </section>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Feed Card -->
+            <div class="card">
+                <div class="card-title">
+                    <h2><i class="fas fa-eye"></i> SYSTEM VISUAL FEED</h2>
+                    <div class="status-indicator">
+                        <div class="status-pulse"></div>
+                        <span id="overall-status">Live Monitoring</span>
+                    </div>
+                </div>
+                <div class="video-frame">
+                    <img src="{{ url_for('video_feed') }}" alt="Live Feed" id="video-feed">
+                    
+                    <div id="camera-off-overlay" class="state-overlay">
+                        <i class="fas fa-video-slash"></i>
+                        <p>Webcam Access Disabled</p>
+                    </div>
+
+                    <div id="ai-off-overlay" class="state-overlay">
+                        <i class="fas fa-pause-circle"></i>
+                        <p>AI Engine Paused</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Logs -->
+            <div class="card">
+                <div class="card-title">
+                    <h2><i class="fas fa-stream"></i> LOG HISTORY</h2>
+                    <button class="btn btn-outline" style="width:auto; padding: 0.5rem 1rem" onclick="fetchLogs()">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+                <div class="logs-table-container">
+                    <table id="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Participant</th>
+                                <th>Date & Time</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Logs here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let isCameraOn = true;
+        let isAIOn = true;
+
+        async function toggleCamera() {
+            const btn = document.getElementById('camera-btn');
+            const overlay = document.getElementById('camera-off-overlay');
+            isCameraOn = !isCameraOn;
+
+            const response = await fetch('/toggle_camera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: isCameraOn })
+            });
+
+            if (response.ok) {
+                btn.classList.toggle('active', isCameraOn);
+                overlay.style.display = isCameraOn ? 'none' : 'flex';
+                updateFeedStatus();
+            }
+        }
+
+        async function toggleAI() {
+            const btn = document.getElementById('ai-btn');
+            const overlay = document.getElementById('ai-off-overlay');
+            isAIOn = !isAIOn;
+
+            const response = await fetch('/toggle_recognition', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: isAIOn })
+            });
+
+            if (response.ok) {
+                btn.classList.toggle('active', isAIOn);
+                overlay.style.display = isAIOn ? 'none' : 'flex';
+                updateFeedStatus();
+            }
+        }
+
+        async function changeCamera() {
+            const selector = document.getElementById('camera-select');
+            const sourceId = selector.value;
+            const statusText = document.getElementById('overall-status');
+
+            statusText.innerText = "Switching Source...";
+            
+            const response = await fetch('/change_source', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: sourceId })
+            });
+
+            if (response.ok) {
+                setTimeout(updateFeedStatus, 1000);
+            }
+        }
+
+        function updateFeedStatus() {
+            const statusText = document.getElementById('overall-status');
+            if (!isCameraOn) statusText.innerText = "Camera Off";
+            else if (!isAIOn) statusText.innerText = "Feed Standby";
+            else statusText.innerText = "Live Monitoring";
+        }
+
+        async function registerUser(e) {
+            e.preventDefault();
+            const enrollBtn = document.getElementById('enroll-btn');
+            const nameInput = document.getElementById('person-name');
+            const statusMsg = document.getElementById('enroll-status');
+            
+            const formData = new FormData();
+            formData.append('name', nameInput.value);
+
+            enrollBtn.disabled = true;
+            statusMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting face biometric signature...';
+            statusMsg.style.color = "var(--primary)";
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    statusMsg.innerHTML = '<i class="fas fa-check-circle"></i> Enrollment Successful!';
+                    statusMsg.style.color = "var(--success)";
+                    nameInput.value = "";
+                    fetchLogs();
+                } else {
+                    statusMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + result.error;
+                    statusMsg.style.color = "var(--danger)";
+                }
+            } catch (err) {
+                statusMsg.innerHTML = '<i class="fas fa-wifi-slash"></i> Communication Error.';
+            } finally {
+                enrollBtn.disabled = false;
+            }
+        }
+
+        async function fetchLogs() {
+            const tableBody = document.querySelector('#logs-table tbody');
+            const response = await fetch('/logs');
+            const logs = await response.json();
+            
+            tableBody.innerHTML = logs.map(log => `
+                <tr>
+                    <td class="log-name">${log.name}</td>
+                    <td class="log-time">${log.time}</td>
+                    <td><span class="status-tag" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">High</span></td>
+                    <td><span class="status-tag">MATCHED</span></td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" style="text-align:center; padding: 2rem; color: var(--text-muted)">Awaiting system detections...</td></tr>';
+        }
+
+        // Auto-refresh logs
+        setInterval(fetchLogs, 5000);
+        fetchLogs();
+    </script>
+</body>
+</html>
