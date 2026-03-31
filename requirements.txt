@@ -1,0 +1,9 @@
+opencv-python
+numpy
+sqlalchemy
+pyyaml
+pytest
+# Models/Face Recognition backends
+# face-recognition
+# mediapipe
+# tensorflow or torch depends on choice
