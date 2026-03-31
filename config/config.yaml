@@ -1,0 +1,16 @@
+# Face Recognition Attendance System Configuration
+
+database:
+  db_type: sqlite
+  db_path: data/attendance.db
+
+logging:
+  level: INFO
+  log_file: logs/app.log
+
+camera:
+  source: 0 # Default webcam
+
+recognition:
+  threshold: 0.4
+  model_path: models/face_model.h5
